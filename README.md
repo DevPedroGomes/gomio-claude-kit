@@ -1,119 +1,142 @@
 # Claude Production Kit
 
-Claude Code writes code fast. It does not tell you whether that code is safe to put in front
-of paying users.
+**Your app was built fast. This tells you what will break when real users hit it.**
 
-This is the part of my setup that closes that gap: a security review command that hunts for
-**exploitable** bugs instead of reciting OWASP, plus the two scripts I actually keep open all
-day - a status line that shows how much of my usage limit is left, and a local report of where
-that usage went.
+If some of your codebase came out of Claude Code, Cursor, Lovable or v0, you already know the
+uncomfortable part: it runs, the demo works, and nobody on the team can honestly say whether the
+auth is right, whether one customer can read another customer's data, or whether a bad afternoon
+turns into a support incident.
 
-No dependencies. No account. Copy two files and it works.
+This is the free, shallow version of the review I do for that. One command, no signup, no
+dependencies. It reads your code and comes back with specific problems, in specific files, with
+the fix.
 
 ---
 
-## Install
+## What you get back
+
+Not a checklist. Findings that name the file, the line, the exploit and the correction:
+
+```
+# Security Review
+Mode: full scan
+Files analyzed: 34    Files skipped: 61 (config, tests, generated)
+
+## Critical (2)
+
+### 1. Any signed-in user can read another workspace's invoices
+File: src/api/invoices/route.ts:41-58
+Category: Multi-tenant IDOR
+
+The handler filters by `invoiceId` from the URL, but never by the workspace the
+signed-in user belongs to. Session is validated, ownership is not.
+
+Why it matters:
+A customer who knows or guesses another invoice id gets the full record back:
+amount, buyer name, billing email. No special access needed - a normal logged-in
+account is enough. This is the failure that ends up in a disclosure email.
+
+Suggested fix:
+  // Before
+  const invoice = await db.invoice.findUnique({ where: { id } })
+
+  // After
+  const invoice = await db.invoice.findFirst({
+    where: { id, workspaceId: session.workspaceId }
+  })
+
+### 2. Stripe webhook accepts unsigned requests
+File: src/api/webhooks/stripe/route.ts:12
+...
+
+## Checks that passed
+Password hashing (bcrypt, 12 rounds) · CSRF tokens on mutations · No secrets in
+git history · File upload validates magic bytes
+
+## Not reviewed / limits
+Two background workers were not read (no entry point found from the routes).
+Dependency CVEs would need an SCA tool - not covered here.
+```
+
+That last section matters as much as the findings. A review that claims full coverage it did
+not have is worse than no review.
+
+---
+
+## Why it finds things a generic prompt misses
+
+**It reads trust boundaries, not files.** Routes, auth middleware, raw queries, webhooks,
+uploads, crypto, payments, tenant filters. It skips config, generated code and type
+definitions on purpose. That is how an experienced reviewer spends attention, and it is why
+this still works on a codebase far larger than any model's context window.
+
+**It searches before it reads.** A dozen targeted scans for the patterns that actually cause
+incidents - SQL built by string interpolation, JWTs decoded without verifying the signature,
+`verify=False`, reused encryption IVs, a spoofable header used as identity, queries missing a
+tenant filter - and only then reads the hits in depth.
+
+**It is instructed not to inflate.** Show the exploit rather than the theory. Suggest real
+code, never "consider using a secure library". Never promote a Low finding to look more useful.
+Never invent a vulnerability - one false positive destroys trust in the entire review.
+
+---
+
+## Try it
 
 ```bash
 git clone https://github.com/DevPedroGomes/claude-production-kit.git
 cd claude-production-kit
-bash install.sh --dry-run   # shows exactly what it would write
+bash install.sh --dry-run   # shows exactly what it would write, changes nothing
 bash install.sh
 ```
 
-Or skip the script entirely - it only copies files:
+Or just copy the one file - that is all the installer does:
 
 ```bash
 cp commands/review-security.md ~/.claude/commands/
 ```
 
-Then, in any repo:
+Then, in your repo:
 
 ```
-/review-security              # reviews only what is about to merge
+/review-security              # only what is about to merge
 /review-security full         # targeted scan of the whole codebase
-/review-security src/auth/    # one path, in depth
+/review-security src/auth/    # one area, in depth
 ```
+
+Two extras are in `extras/`, because they are what I keep open all day: a status line showing
+model, context used and how much of your usage limit is left, and a script that reports where
+that usage actually went, by day, project and session. Both run locally and send nothing
+anywhere.
 
 ---
 
-## What is in here
+## What this does not cover
 
-### `commands/review-security.md`
+This command finds security defects. It does not tell you whether the architecture holds, what
+the thing will cost you at 10x the traffic, whether your plan limits are actually enforced, or
+which parts are cheaper to rebuild than to repair.
 
-A security review that behaves like a reviewer with a finite context window, because it has one.
-
-Three things make it different from asking "review my code for security issues":
-
-**It reads boundaries, not files.** Routes, auth middleware, raw queries, webhooks, uploads,
-crypto, payments, tenant filters. It explicitly skips config, generated code and pure type
-definitions. That is how a real reviewer spends attention, and it is why the review still works
-on a codebase that does not fit in context.
-
-**It starts with ripgrep, not with reading.** A dozen scans for the patterns that actually
-produce incidents - string-interpolated SQL, `jwt.decode` without verification, `verify=False`,
-reused IVs, `X-Forwarded-For` used as an identity, queries with no tenant filter - and only then
-reads the hits in depth.
-
-**It is told not to inflate.** Explicit instructions: show the exploit rather than the theory,
-suggest real code rather than "consider a secure library", never promote a Low to look useful,
-and list what was *not* reviewed. One false positive destroys trust in a whole review, so the
-command says so out loud.
-
-It also carries a **stack conventions** block - a list of the specific invariants of one codebase
-(where the client IP comes from, how sensitive identifiers are stored, how credits are debited).
-Replace that block with your own. The value is that the list is specific to a codebase, not that
-my list is right for yours.
-
-### `extras/statusline.sh`
-
-Status line showing directory, git branch, model and reasoning effort, context used, and how
-much of the 5-hour and weekly limits is gone. Point `settings.json` at it:
-
-```json
-{ "statusLine": { "type": "command", "command": "~/.claude/scripts/statusline.sh" } }
-```
-
-### `extras/usage.py`
-
-Reads `~/.claude/projects/*.jsonl` and reports where the week went - by day, model, project and
-session. Runs locally, sends nothing anywhere.
-
-```bash
-python3 extras/usage.py          # current week
-```
+That is the deeper review: ten areas, ending in a keep / fix / rebuild verdict per area, a
+phased plan and an estimate. It is a paid, fixed-fee engagement of about a week, and it is how
+most of my client work starts. If the sample output above is the level you need on your own
+codebase, that is the version to ask for.
 
 ---
 
-## What is deliberately not in here
-
-**The full production audit.** There is a longer command behind this one - ten pillars covering
-architecture, plan enforcement, cost, multi-tenancy, concurrency, performance and data
-protection, ending in a keep / fix / rebuild verdict per area. That one is how I do paid
-assessments, so it is not in the box. If that is what you actually need, see below.
-
-**My global `CLAUDE.md`, MCP config and project skills.** They contain server addresses,
-client project names and personal paths. Nobody else's dotfiles are useful anyway - what
-transfers is the method, not my file layout.
-
----
-
-## Who wrote this
+## Who is behind it
 
 I build phone agents that answer the calls a team cannot get to and write what happened into the
-system that team already runs on - and I do it with Claude Code in front of me all day, reading
-every line before it merges.
+system that team already runs on. Everything I ship runs on infrastructure I manage myself, and
+I use Claude Code all day - reading every line before it merges, writing the parts that touch
+money or customer records by hand.
 
-A large share of that work now is repairing applications that were generated quickly and then
-had to survive real users: auth and permissions redone properly, the data layer reviewed, an
-honest verdict on what to keep and what to rebuild. This command is the shallow, free version
-of the first hour of that job.
+A growing share of my work is taking applications that were generated quickly and making them
+safe to put a team on. This command is the first hour of that job, given away.
 
-If you want the deep version on your codebase, or an agent that talks to your customers without
-inventing things, open an issue or reach me on Upwork.
+**Want the full review, or an agent that talks to your customers without inventing things?**
+Open an issue here, or find me on Upwork.
 
 ---
 
-## License
-
-MIT. Use it, fork it, sell the output of it. Attribution appreciated, not required.
+MIT licensed. Use it, fork it, sell what it produces. Attribution appreciated, not required.
