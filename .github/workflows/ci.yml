@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck and ripgrep
+        run: sudo apt-get update && sudo apt-get install -y shellcheck ripgrep
+      - name: shellcheck
+        run: shellcheck install.sh extras/statusline.sh scaffold/.claude/hooks/*.sh scaffold/scripts/verify.sh tests/*.sh
+      - name: Python compiles
+        run: python3 -m py_compile extras/usage.py tests/test_usage.py tests/test_patterns.py
+      - name: prices.json and scaffold settings are valid JSON
+        run: |
+          python3 -m json.tool extras/prices.json > /dev/null
+          python3 -m json.tool scaffold/.claude/settings.json > /dev/null
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ripgrep and jq (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ripgrep jq
+      - name: Install ripgrep (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ripgrep
+      - name: usage.py and search-pattern tests
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Hook smoke tests
+        run: bash tests/hooks.sh
+      - name: Status line tests
+        run: bash tests/statusline.sh
+      - name: Installer tests (bash 3.2 on macOS)
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then /bin/bash tests/install.sh; else bash tests/install.sh; fi
