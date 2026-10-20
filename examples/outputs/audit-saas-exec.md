@@ -5,7 +5,7 @@
 | Date | 2026-10-20 (run started 17:35 UTC) |
 | Claude Code | 2.1.304 (`claude --version`) |
 | Model | claude-opus-5-5 (every turn) |
-| Kit commit | `dac7964` (the command file as of that commit) |
+| Kit commit | `0ab016b` (the command files as of that commit; the run recorded `dac7964`, whose hash changed when a stray bytecode file was removed from the unpublished branch history, with no other difference) |
 | Invocation | `claude -p "/audit-saas exec" --model opus --setting-sources project --strict-mcp-config --output-format stream-json --verbose --max-budget-usd 25` |
 | Target | a copy of `examples/vulnerable-saas` in a temporary directory, one git commit, the kit commands installed in its `.claude/commands/` |
 | Reported by Claude Code | US$ 0.41 at API list prices, 63 s wall time, 6 turns, 5 Bash calls |
