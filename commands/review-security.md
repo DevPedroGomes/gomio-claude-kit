@@ -50,6 +50,10 @@ Confirm it exists with `ls`, list its files with `git ls-files <path>` (or `rg -
 triage the boundaries first, and go deep on the suspicious ones. Read code outside the path only to
 follow a data flow.
 
+Run every shell command on its own: one plain `git`, `rg` or `ls` per call, no `;` or `&&`
+chains, no `for` loops, no `git -C`. Claude Code runs plain read-only commands without asking,
+but asks for approval on composite ones, and in a headless run nobody can answer.
+
 ## 2. Where to spend attention
 
 Read deeply (these are trust boundaries):
