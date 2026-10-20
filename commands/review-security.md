@@ -1,6 +1,6 @@
 ---
 description: Security review that reports only verified, exploitable findings. Covers OWASP classes plus multi-tenant isolation, billing races, paid-API spend and LLM agents with tools.
-allowed-tools: Read, Grep, Glob, Agent, Task, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git show:*), Bash(git ls-files:*), Bash(git rev-parse:*), Bash(git symbolic-ref:*), Bash(git merge-base:*), Bash(git branch:*), Bash(ls:*), Bash(wc:*), Bash(head:*)
+allowed-tools: Read, Grep, Glob, Task, Agent, Bash(git symbolic-ref --short refs/remotes/origin/HEAD), Bash(git rev-parse --verify --quiet:*)
 argument-hint: "[empty = pending changes | full | <path>]"
 ---
 
@@ -46,8 +46,9 @@ and the boundary files in depth.
 
 ### A path (for example `src/auth/`): focused review
 
-Confirm it exists with `ls`, list its files with Glob, triage the boundaries first, and go deep on
-the suspicious ones. Read code outside the path only to follow a data flow.
+Confirm it exists with `ls`, list its files with `git ls-files <path>` (or `rg --files <path>`),
+triage the boundaries first, and go deep on the suspicious ones. Read code outside the path only to
+follow a data flow.
 
 ## 2. Where to spend attention
 
@@ -70,9 +71,11 @@ the bug), generated code, lockfiles, `node_modules`, `.next`, `dist`, `build`, `
 
 ## 3. Scans (for `full` and path modes)
 
-Run these with the **Grep tool**, not Bash. Each line below is: lead, file types, then the pattern
-(ripgrep regex; `(?i)` means case-insensitive). Exclude `node_modules`, `.next`, `dist`, `build`
-and `.venv`. A hit is a lead to read, never a finding by itself.
+Run these with ripgrep, for example `rg -n --no-heading -t ts -t js -e '<pattern>'`, or with the Grep
+tool if your Claude Code has one. Each line below is: lead, file types, then the pattern (ripgrep
+regex; `(?i)` means case-insensitive). ripgrep already skips what `.gitignore` lists; also exclude
+`node_modules`, `.next`, `dist`, `build` and `.venv` if they are not ignored. Do not use `rg --pre`.
+A hit is a lead to read, never a finding by itself.
 
 ```text
 secrets            all source   (?i)(api[_-]?key|secret|password|token|bearer)\s*[:=]\s*['"][A-Za-z0-9_\-]{16,}
@@ -188,9 +191,10 @@ you think nothing in between stops it.
 
 ### Step 2: verify every candidate before reporting it
 
-Each candidate gets an independent check whose job is to **disprove** it. Launch one sub-agent per
-candidate with the Agent tool (`general-purpose`), all in parallel in a single message. With more
-than 9 candidates, group them three per sub-agent. Give each sub-agent the candidate, sections 4
+Each candidate gets an independent check whose job is to **disprove** it. Launch one
+`general-purpose` sub-agent per candidate with the Task tool (named Agent in some Claude Code
+versions), all in parallel in a single message. With more than 9 candidates, group them three per
+sub-agent. Give each sub-agent the candidate, sections 4
 and 5 of this command, and these instructions:
 
 > Try to prove this finding wrong. Re-read the code from the entry point to the sink. Check:
@@ -202,7 +206,7 @@ and 5 of this command, and these instructions:
 > 8: clear vulnerable pattern, attacker control confirmed. 5-7: plausible but depends on something
 > you could not confirm. 1-4: likely false positive. Do not run or modify anything; read only.
 
-If the Agent tool is not available, do the same check yourself, one candidate at a time, and say
+If sub-agents are not available, do the same check yourself, one candidate at a time, and say
 so under "Not reviewed / limits".
 
 ### Step 3: filter

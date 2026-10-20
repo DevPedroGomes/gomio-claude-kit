@@ -1,6 +1,6 @@
 ---
 description: Pre-production audit of a SaaS that charges customers and calls paid APIs. Operational readiness (architecture, security, tenancy, robustness, privacy) plus billing and AI-cost control (plan enforcement, abuse, cost tracking, caps and races, provider balance, reconciliation, margin).
-allowed-tools: Read, Grep, Glob, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git ls-files:*), Bash(git rev-parse:*), Bash(ls:*), Bash(wc:*), Bash(head:*)
+allowed-tools: Read, Grep, Glob, Task, Agent
 argument-hint: "[empty = full | exec | only=saas | only=billing | pillars=S2,B3,...]"
 ---
 
@@ -73,9 +73,10 @@ uses and do not recommend switching gateways.
 ## PHASE 1: FULL MAP (always)
 
 Your context window is finite. Map first with cheap listing and search, then read in depth only
-the trust boundaries and the money path. Use the Grep tool for searches (patterns below are
-ripgrep regex, `(?i)` means case-insensitive) and exclude `node_modules`, `.next`, `dist`,
-`build` and `.venv`.
+the trust boundaries and the money path. Search with ripgrep (`rg -n --no-heading -e '<pattern>'`)
+or the Grep tool if your Claude Code has one. The patterns below are ripgrep regex, `(?i)` means
+case-insensitive. Exclude `node_modules`, `.next`, `dist`, `build` and `.venv` if `.gitignore` does
+not already. Do not use `rg --pre`.
 
 ### 1.1 Structure and infrastructure
 
@@ -87,7 +88,7 @@ git ls-files '*Dockerfile*' '*docker-compose*' '*.dockerignore' '*.env.example' 
 git ls-files --others --exclude-standard | head -50
 ```
 
-If this is not a git repository, use the Glob tool for the same names.
+If this is not a git repository, use `rg --files -g '<name>'` for the same names.
 
 ### 1.2 Stack and integrations
 
