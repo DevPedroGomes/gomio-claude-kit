@@ -78,6 +78,11 @@ or the Grep tool if your Claude Code has one. The patterns below are ripgrep reg
 case-insensitive. Exclude `node_modules`, `.next`, `dist`, `build` and `.venv` if `.gitignore` does
 not already. Do not use `rg --pre`.
 
+Run every shell command on its own: one plain `git`, `rg` or `ls` per call, no `;` or `&&`
+chains, no `for` loops, no `git -C`. Claude Code runs plain read-only commands without asking,
+but asks for approval on composite ones, and in a headless run nobody can answer. To read files,
+use the Read tool.
+
 ### 1.1 Structure and infrastructure
 
 ```bash
