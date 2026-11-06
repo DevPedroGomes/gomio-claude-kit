@@ -105,7 +105,7 @@ providers** and other external integrations.
 ```text
 payment gateway   (?i)stripe|paddle|lemonsqueezy|lemon.?squeezy|mercadopago|adyen|braintree|paypal|razorpay|chargebee
 paid AI           (?i)openai|anthropic|claude|gemini|vertex|bedrock|dall-e|whisper|deepgram|elevenlabs|replicate|fal\.ai|together|groq|cohere|voyage|openrouter|mistral|deepseek
-other paid        (?i)twilio|sendgrid|resend|mailgun|postmark|vonage|whatsapp|s3|r2|mapbox|google.?maps
+other paid        (?i)sendgrid|resend|mailgun|postmark|vonage|whatsapp|s3|r2|mapbox|google.?maps
 ```
 
 For each paid provider note: billing mode (prepaid, card on file, subscription, pay as you go),
@@ -366,7 +366,7 @@ Answers the question: can someone make the app spend money without being an iden
   re-check session and plan **inside** the action? Checking only in the page or layout = CRITICAL.
 - **Middleware with a `matcher`** that misses API routes (`/api/*`, new routes, trailing slash,
   rewrites)? A paid route outside the matcher = CRITICAL.
-- **Inbound messaging webhooks** (WhatsApp, Telegram, Twilio, Slack) that trigger an LLM: do they
+- **Inbound messaging webhooks** (WhatsApp, Telegram, SMS, Slack) that trigger an LLM: do they
   verify the origin (signature, secret header, instance token)? Missing = CRITICAL (anyone can POST
   and burn LLM spend on behalf of a tenant).
 - **Provider key exposed to the browser** (`NEXT_PUBLIC_*`, `VITE_*`, the bundle, a direct call from
@@ -449,7 +449,7 @@ The layer that literally answers "customer pays today, comes back in three days:
 - **Automatic alert** (e-mail, chat) when balance < 7 days of runway (burn x 7) or < threshold, and
   when monthly spend > 50% of MRR? Missing = HIGH.
 - **Known balance sources** (confirm the current API before stating it): OpenRouter
-  `GET /api/v1/credits`; Twilio `GET /2010-04-01/Accounts/{sid}/Balance.json`; Deepgram
+  `GET /api/v1/credits`; telephony and SMS providers usually expose a balance endpoint; Deepgram
   `GET /v1/projects/{id}/balances`; OpenAI and Anthropic expose organization usage and cost APIs,
   while the prepaid balance itself is usually only in the console. A provider with no balance API
   needs a **daily manual check and a documented conservative threshold** (acceptable = LOW).
